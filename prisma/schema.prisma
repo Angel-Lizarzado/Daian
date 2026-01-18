@@ -28,17 +28,22 @@ model Product {
   image       String
   categoryId  Int
   category    Category @relation(fields: [categoryId], references: [id])
+  sales       Sale[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-model SaleLog {
-  id                 Int      @id @default(autoincrement())
-  productName        String
-  priceUsdAtMoment   Float
-  exchangeRate       Float
-  priceVesCalculated Float
-  createdAt          DateTime @default(now())
+model Sale {
+  id           Int      @id @default(autoincrement())
+  productId    Int
+  product      Product  @relation(fields: [productId], references: [id])
+  quantity     Int
+  priceUsd     Float    // Precio unitario al momento de la venta
+  totalUsd     Float    // Total = priceUsd * quantity
+  exchangeRate Float    // Tasa de cambio al momento
+  totalVes     Float    // Total en bolívares
+  notes        String?  // Notas opcionales (cliente, contacto, etc.)
+  createdAt    DateTime @default(now())
 }
 
 model HeroSlide {

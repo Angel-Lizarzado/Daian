@@ -5,15 +5,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     Store, Package, MessageCircle, BarChart3, Settings,
-    Plus, Search, Edit, Trash2, X, Loader2, Upload, Image as ImageIcon
+    Plus, Search, Edit, Trash2, X, Loader2, Upload, Image as ImageIcon, Tag, DollarSign
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { getProducts, createProduct, updateProduct, deleteProduct, type ProductWithCategory } from '@/actions/products';
-import { getCategories, createCategory } from '@/actions/categories';
+import { getCategories, getCategoriesWithCount, createCategory, type CategoryWithCount } from '@/actions/categories';
 import { getAllHeroSlides } from '@/actions/hero-slides';
+import { getSales, type SaleWithProduct } from '@/actions/sales';
 import { useExchangeRate } from '@/context/ExchangeRateContext';
 import { formatVes } from '@/lib/exchange-rate';
 import AdminSlidesSection from '@/components/AdminSlidesSection';
+import AdminCategoriesSection from '@/components/AdminCategoriesSection';
+import AdminSalesSection from '@/components/AdminSalesSection';
 import ImageUploader from '@/components/ImageUploader';
 
 interface Category {
@@ -49,14 +52,16 @@ export default function AdminDashboard() {
     const { rate } = useExchangeRate();
     const [products, setProducts] = useState<ProductWithCategory[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [categoriesWithCount, setCategoriesWithCount] = useState<CategoryWithCount[]>([]);
     const [slides, setSlides] = useState<HeroSlide[]>([]);
+    const [sales, setSales] = useState<SaleWithProduct[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState<ProductWithCategory | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [saving, setSaving] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
-    const [activeTab, setActiveTab] = useState<'products' | 'slides'>('products');
+    const [activeTab, setActiveTab] = useState<'products' | 'slides' | 'categories' | 'sales'>('products');
 
     const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ProductFormData>();
     const priceUsd = watch('priceUsd');
@@ -74,14 +79,18 @@ export default function AdminDashboard() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [productsData, categoriesData, slidesData] = await Promise.all([
+            const [productsData, categoriesData, categoriesCountData, slidesData, salesData] = await Promise.all([
                 getProducts().catch(() => [] as ProductWithCategory[]),
                 getCategories().catch(() => [] as Category[]),
-                getAllHeroSlides().catch(() => [] as HeroSlide[])
+                getCategoriesWithCount().catch(() => [] as CategoryWithCount[]),
+                getAllHeroSlides().catch(() => [] as HeroSlide[]),
+                getSales().catch(() => [] as SaleWithProduct[])
             ]);
             setProducts(productsData);
             setCategories(categoriesData);
+            setCategoriesWithCount(categoriesCountData);
             setSlides(slidesData);
+            setSales(salesData);
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -193,6 +202,26 @@ export default function AdminDashboard() {
                     >
                         <Package className="h-5 w-5" />
                         <span className="text-sm">Inventario</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('categories')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-colors ${activeTab === 'categories'
+                            ? 'bg-primary/15 text-text-main font-bold'
+                            : 'text-text-muted hover:bg-background hover:text-text-main'
+                            }`}
+                    >
+                        <Tag className="h-5 w-5" />
+                        <span className="text-sm">Categorías</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('sales')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-colors ${activeTab === 'sales'
+                            ? 'bg-green-100 text-green-700 font-bold'
+                            : 'text-text-muted hover:bg-background hover:text-text-main'
+                            }`}
+                    >
+                        <DollarSign className="h-5 w-5" />
+                        <span className="text-sm">Ventas</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('slides')}
@@ -368,6 +397,14 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     </>
+                ) : activeTab === 'categories' ? (
+                    <div className="flex-1 overflow-y-auto px-8 py-6">
+                        <AdminCategoriesSection categories={categoriesWithCount} onRefresh={loadData} />
+                    </div>
+                ) : activeTab === 'sales' ? (
+                    <div className="flex-1 overflow-y-auto px-8 py-6">
+                        <AdminSalesSection sales={sales} products={products} onRefresh={loadData} />
+                    </div>
                 ) : (
                     <div className="flex-1 overflow-y-auto px-8 py-6">
                         <AdminSlidesSection slides={slides} onRefresh={loadData} />
