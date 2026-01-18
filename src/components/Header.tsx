@@ -102,7 +102,8 @@ export default function Header({ categories = [] }: HeaderProps) {
                             </button>
                         ))}
                         {isAuthenticated && (
-                            <Link href="/admin" className="text-sm font-medium text-primary hover:text-primary-hover transition-colors">
+                            <Link href="/admin" className="flex items-center gap-1.5 text-sm font-bold text-primary hover:text-primary-hover transition-colors">
+                                <span>⚙️</span>
                                 Admin
                             </Link>
                         )}
