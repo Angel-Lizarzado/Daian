@@ -1,26 +1,151 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* ===== DAIAN STORE - Custom Theme ===== */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Primary Colors - Naranja intenso */
+  --color-primary: #ff7f50;
+  --color-primary-hover: #ff6633;
+  --color-primary-light: #fff0eb;
+  --color-primary-muted: #ffb699;
+
+  /* WhatsApp */
+  --color-whatsapp: #25D366;
+  --color-whatsapp-hover: #20bd5a;
+
+  /* Background Colors */
+  --color-background: #faf8f7;
+  --color-background-dark: #1a0f0a;
+  --color-surface: #ffffff;
+  --color-surface-dark: #2a1a14;
+
+  /* Text Colors */
+  --color-text-main: #1a0f0a;
+  --color-text-muted: #8a6b5d;
+  --color-text-light: #ffffff;
+
+  /* Border Colors */
+  --color-border: #ebe5e2;
+  --color-border-dark: #3e2b25;
+
+  /* Fonts */
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  --font-serif: "Playfair Display", serif;
+
+  /* Border Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+  --radius-2xl: 2.5rem;
+  --radius-full: 9999px;
 }
 
+/* Dark mode desactivado - siempre modo claro */
+/*
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-background: var(--color-background-dark);
+    --color-surface: var(--color-surface-dark);
+    --color-text-main: var(--color-text-light);
+    --color-border: var(--color-border-dark);
+  }
+}
+*/
+
+/* Base styles */
+body {
+  background: var(--color-background);
+  color: var(--color-text-main);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Serif logo font */
+.font-serif-logo {
+  font-family: var(--font-serif);
+}
+
+/* Scrollbar customization */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom animations */
+@keyframes pulse-soft {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* Slider Animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.6s ease-out;
+}
+
+.animate-slide-up-delay {
+  animation: slide-up 0.6s ease-out 0.1s both;
+}
+
+.animate-slide-up-delay-2 {
+  animation: slide-up 0.6s ease-out 0.2s both;
 }

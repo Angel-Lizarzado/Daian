@@ -1,0 +1,56 @@
+// Daian Store - Prisma Schema
+// Base de datos SQLite para despliegue rápido
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  priceUsd    Float
+  oldPriceUsd Float?
+  isOffer     Boolean  @default(false)
+  stock       Int      @default(0)
+  image       String
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SaleLog {
+  id                 Int      @id @default(autoincrement())
+  productName        String
+  priceUsdAtMoment   Float
+  exchangeRate       Float
+  priceVesCalculated Float
+  createdAt          DateTime @default(now())
+}
+
+model HeroSlide {
+  id          Int      @id @default(autoincrement())
+  title       String
+  subtitle    String
+  buttonText  String
+  buttonLink  String
+  image       String
+  badge       String?
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
