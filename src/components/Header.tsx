@@ -9,6 +9,7 @@ export default function Header() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [scrolled, setScrolled] = useState(false);
     const { count } = useFavorites();
 
     useEffect(() => {
@@ -22,6 +23,15 @@ export default function Header() {
         // Listen for cookie changes
         const interval = setInterval(checkAuth, 1000);
         return () => clearInterval(interval);
+    }, []);
+
+    // Detectar scroll para efecto visual
+    useEffect(() => {
+        const handleScroll = () => {
+            setScrolled(window.scrollY > 20);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
     const handleLogout = () => {
@@ -38,33 +48,24 @@ export default function Header() {
     };
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-border bg-surface/90 backdrop-blur-md">
+        <header className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ${scrolled
+                ? 'bg-surface/95 backdrop-blur-md shadow-sm border-b border-border'
+                : 'bg-surface border-b border-border'
+            }`}>
             <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
-                {/* Logo & Mobile Menu */}
-                <div className="flex items-center gap-4">
-                    <button className="block lg:hidden text-text-main">
-                        <Menu className="h-6 w-6" />
-                    </button>
-                    <Link href="/" className="flex items-center gap-2 group">
-                        <div className="flex size-8 items-center justify-center rounded-full bg-primary/20 text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-300">
-                            <span className="text-lg">🌸</span>
-                        </div>
-                        <h1 className="font-serif-logo text-2xl font-bold tracking-tight text-text-main">Daian</h1>
-                    </Link>
-                </div>
+                {/* Logo */}
+                <Link href="/" className="flex items-center gap-2 group">
+                    <div className="flex size-8 items-center justify-center rounded-full bg-primary/20 text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-300">
+                        <span className="text-lg">🌸</span>
+                    </div>
+                    <h1 className="font-serif-logo text-2xl font-bold tracking-tight text-text-main">Daian</h1>
+                </Link>
 
                 {/* Desktop Navigation */}
                 <nav className="hidden lg:flex items-center gap-10">
-                    <Link href="/" className="text-sm font-medium text-text-main hover:text-primary transition-colors">
-                        Inicio
+                    <Link href="/#products" className="text-sm font-medium text-text-main hover:text-primary transition-colors">
+                        Tienda
                     </Link>
-                    <Link href="/?filter=offers" className="text-sm font-medium text-text-main hover:text-primary transition-colors">
-                        Ofertas
-                    </Link>
-                    <Link href="/?filter=new" className="text-sm font-medium text-text-main hover:text-primary transition-colors">
-                        Nuevos
-                    </Link>
-                    {/* Solo mostrar Admin si está autenticado */}
                     {isAuthenticated && (
                         <Link href="/admin" className="text-sm font-medium text-primary hover:text-primary-hover transition-colors">
                             Admin
@@ -115,7 +116,7 @@ export default function Header() {
                         )}
                     </Link>
 
-                    {/* Botón de cerrar sesión si está autenticado */}
+                    {/* Logout button */}
                     {isAuthenticated && (
                         <button
                             onClick={handleLogout}

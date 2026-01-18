@@ -42,7 +42,7 @@ export default async function RootLayout({
           >
             <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">
               <Header />
-              <main className="flex-1">
+              <main className="flex-1 pt-20">
                 {children}
               </main>
               <Footer />
