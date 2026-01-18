@@ -1,6 +1,5 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
 import { createProduct } from './products';
 
 interface ScrapedProduct {
@@ -9,6 +8,7 @@ interface ScrapedProduct {
     price: number;
     images: string[];
     attributes: Record<string, string>;
+    source: 'aliexpress' | 'alibaba' | 'unknown';
 }
 
 interface ScrapeResult {
@@ -17,67 +17,122 @@ interface ScrapeResult {
     error?: string;
 }
 
-export async function scrapeAlibabaProduct(url: string): Promise<ScrapeResult> {
+export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
     try {
-        // Validar URL
-        if (!url.includes('alibaba.com')) {
-            return { success: false, error: 'La URL debe ser de Alibaba.com' };
+        // Detectar la fuente
+        let source: 'aliexpress' | 'alibaba' | 'unknown' = 'unknown';
+        if (url.includes('aliexpress.com')) {
+            source = 'aliexpress';
+        } else if (url.includes('alibaba.com')) {
+            source = 'alibaba';
+        } else {
+            return { success: false, error: 'URL no soportada. Usa AliExpress o Alibaba.' };
         }
 
-        // Intentar hacer fetch de la página
+        // Hacer fetch de la página
         const response = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+                'Cache-Control': 'no-cache',
             },
         });
 
         if (!response.ok) {
-            return { success: false, error: `Error al acceder a la página: ${response.status}` };
+            return { success: false, error: `Error al acceder: ${response.status}` };
         }
 
         const html = await response.text();
 
-        // Extraer datos con regex (más confiable que parsear HTML completo)
-        const titleMatch = html.match(/<h1[^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)<\/h1>/i) ||
-            html.match(/<title>([^<]+)<\/title>/i);
-
-        const title = titleMatch
-            ? titleMatch[1].replace(/\s*-\s*Alibaba\.com.*$/i, '').trim()
-            : 'Producto sin nombre';
-
-        // Buscar descripción
-        const descMatch = html.match(/<meta\s+name="description"\s+content="([^"]+)"/i) ||
-            html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i);
-        const description = descMatch ? descMatch[1].trim() : '';
-
-        // Buscar precio (puede variar mucho en la estructura)
-        const priceMatch = html.match(/\$\s*([\d,]+\.?\d*)/);
-        const price = priceMatch ? parseFloat(priceMatch[1].replace(',', '')) : 0;
-
-        // Buscar imágenes (Open Graph y otras)
-        const imageMatches = html.matchAll(/<meta\s+property="og:image"\s+content="([^"]+)"/gi);
+        // Intentar extraer datos según la fuente
+        let title = '';
+        let description = '';
+        let price = 0;
         const images: string[] = [];
-        for (const match of imageMatches) {
-            if (match[1] && !images.includes(match[1])) {
-                images.push(match[1]);
+
+        // === EXTRAER TÍTULO ===
+        // Método 1: Meta Open Graph
+        const ogTitleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
+        if (ogTitleMatch) {
+            title = ogTitleMatch[1].replace(/-\s*AliExpress.*$/i, '').replace(/-\s*Alibaba.*$/i, '').trim();
+        }
+
+        // Método 2: Title tag
+        if (!title) {
+            const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+            if (titleMatch) {
+                title = titleMatch[1].replace(/-\s*AliExpress.*$/i, '').replace(/-\s*Alibaba.*$/i, '').replace(/\|.*$/, '').trim();
             }
         }
 
-        // Buscar imágenes adicionales en el HTML
-        const imgMatches = html.matchAll(/<img[^>]+src="(https:\/\/[^"]*alicdn[^"]+)"/gi);
-        for (const match of imgMatches) {
+        // === EXTRAER DESCRIPCIÓN ===
+        const descMatch = html.match(/<meta\s+(?:name|property)="(?:description|og:description)"\s+content="([^"]+)"/i);
+        if (descMatch) {
+            description = descMatch[1].trim();
+        }
+
+        // === EXTRAER PRECIO ===
+        // Buscar precio en varios formatos
+        const pricePatterns = [
+            /\$\s*([\d,]+\.?\d*)/,
+            /USD\s*([\d,]+\.?\d*)/i,
+            /price['":\s]*['"$]*\s*([\d,]+\.?\d*)/i,
+            /"price":\s*"?\$?([\d,]+\.?\d*)/i,
+        ];
+
+        for (const pattern of pricePatterns) {
+            const match = html.match(pattern);
+            if (match) {
+                const priceStr = match[1].replace(',', '');
+                const parsed = parseFloat(priceStr);
+                if (parsed > 0 && parsed < 10000) { // Rango razonable
+                    price = parsed;
+                    break;
+                }
+            }
+        }
+
+        // === EXTRAER IMÁGENES ===
+        // Open Graph image
+        const ogImageMatches = html.matchAll(/<meta\s+property="og:image(?::url)?"\s+content="([^"]+)"/gi);
+        for (const match of ogImageMatches) {
             if (match[1] && !images.includes(match[1]) && images.length < 5) {
                 images.push(match[1]);
             }
         }
 
-        // Si no encontramos datos útiles
-        if (!title || title === 'Producto sin nombre') {
+        // Buscar en JSON estructurado
+        const jsonImageMatch = html.match(/"imagePathList":\s*\[([^\]]+)\]/);
+        if (jsonImageMatch) {
+            const imgList = jsonImageMatch[1].match(/"([^"]+)"/g);
+            if (imgList) {
+                for (const img of imgList) {
+                    const cleanImg = img.replace(/"/g, '');
+                    if (cleanImg.startsWith('http') && !images.includes(cleanImg) && images.length < 5) {
+                        images.push(cleanImg);
+                    }
+                }
+            }
+        }
+
+        // Buscar imágenes de CDN de AliExpress/Alibaba
+        const cdnImageMatches = html.matchAll(/(https?:\/\/[^"'\s]+(?:alicdn|ae01|cbu01)[^"'\s]+\.(?:jpg|jpeg|png|webp))/gi);
+        for (const match of cdnImageMatches) {
+            if (match[1] && !images.includes(match[1]) && images.length < 5) {
+                // Limpiar la URL y asegurar tamaño grande
+                let imgUrl = match[1].split('_')[0]; // Remover sufijos de tamaño
+                if (!imgUrl.includes('avatar') && !imgUrl.includes('icon')) {
+                    images.push(match[1]);
+                }
+            }
+        }
+
+        // Si no hay título, falló
+        if (!title || title.length < 5) {
             return {
                 success: false,
-                error: 'No se pudieron extraer datos del producto. Alibaba puede estar bloqueando la solicitud o la estructura de la página cambió.'
+                error: `No se pudo extraer información del producto. La página puede estar bloqueando solicitudes automáticas o requiere verificación humana.`
             };
         }
 
@@ -85,29 +140,32 @@ export async function scrapeAlibabaProduct(url: string): Promise<ScrapeResult> {
             success: true,
             data: {
                 title,
-                description: description || `Producto importado desde Alibaba: ${title}`,
+                description: description || `Producto importado desde ${source === 'aliexpress' ? 'AliExpress' : 'Alibaba'}: ${title}`,
                 price,
-                images,
+                images: images.length > 0 ? images : [],
                 attributes: {},
+                source,
             },
         };
+
     } catch (error) {
-        console.error('Error scraping Alibaba:', error);
+        console.error('Error scraping product:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Error desconocido al extraer datos'
+            error: error instanceof Error ? error.message : 'Error desconocido'
         };
     }
 }
 
-export async function importAlibabaProduct(
+export async function importProductFromScrape(
     scrapedData: ScrapedProduct,
     categoryId: number,
-    customPrice?: number
+    customPrice?: number,
+    customName?: string
 ): Promise<{ success: boolean; productId?: number; error?: string }> {
     try {
         const product = await createProduct({
-            name: scrapedData.title,
+            name: customName || scrapedData.title,
             description: scrapedData.description,
             priceUsd: customPrice || scrapedData.price || 10,
             isOffer: false,
@@ -121,7 +179,7 @@ export async function importAlibabaProduct(
         console.error('Error importing product:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Error al importar el producto'
+            error: error instanceof Error ? error.message : 'Error al importar'
         };
     }
 }
