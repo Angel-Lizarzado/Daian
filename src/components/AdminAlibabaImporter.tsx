@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Link2, Loader2, CheckCircle, AlertCircle, Download, X, Package, ExternalLink, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Link2, Loader2, CheckCircle, AlertCircle, Download, X, Package, ExternalLink, ChevronLeft, ChevronRight, Image as ImageIcon, FileText } from 'lucide-react';
 import { scrapeProductFromUrl, importProductFromScrape } from '@/actions/alibaba-scraper';
 
 interface Category {
@@ -32,6 +32,7 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
     const [selectedCategory, setSelectedCategory] = useState<number>(categories[0]?.id || 0);
     const [customPrice, setCustomPrice] = useState<string>('');
     const [customName, setCustomName] = useState<string>('');
+    const [customDescription, setCustomDescription] = useState<string>('');
     const [importSuccess, setImportSuccess] = useState(false);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -53,6 +54,7 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
             setScrapedData(result.data);
             setCustomPrice(result.data.price?.toString() || '');
             setCustomName(result.data.title || '');
+            setCustomDescription(result.data.description || '');
         } else {
             setError(result.error || 'Error desconocido');
         }
@@ -67,10 +69,11 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
         setError(null);
 
         const result = await importProductFromScrape(
-            scrapedData,
+            { ...scrapedData, description: customDescription },
             selectedCategory,
             customPrice ? parseFloat(customPrice) : undefined,
-            customName || undefined
+            customName || undefined,
+            customDescription || undefined
         );
 
         if (result.success) {
@@ -79,6 +82,7 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
             setUrl('');
             setCustomPrice('');
             setCustomName('');
+            setCustomDescription('');
             await onProductImported();
         } else {
             setError(result.error || 'Error al importar');
@@ -94,6 +98,7 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
         setImportSuccess(false);
         setCustomPrice('');
         setCustomName('');
+        setCustomDescription('');
         setCurrentImageIndex(0);
     };
 
@@ -130,7 +135,7 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
                 <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-xl flex items-center gap-3">
                     <CheckCircle className="h-5 w-5 text-green-600" />
                     <div>
-                        <p className="text-green-800 font-medium">¡Producto importado con {scrapedData?.images.length || 0} imágenes!</p>
+                        <p className="text-green-800 font-medium">¡Producto importado!</p>
                         <p className="text-green-600 text-sm">Ya puedes verlo en el inventario</p>
                     </div>
                     <button onClick={handleReset} className="ml-auto text-green-600 hover:text-green-800">
@@ -280,7 +285,7 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
                             <div className="space-y-3">
                                 {/* Editable Title */}
                                 <div>
-                                    <label className="text-xs font-bold text-text-muted uppercase">Nombre</label>
+                                    <label className="text-xs font-bold text-text-muted uppercase">Nombre del producto</label>
                                     <input
                                         type="text"
                                         value={customName}
@@ -288,20 +293,6 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
                                         className="w-full mt-1 px-3 py-2 rounded-lg bg-background border-none text-sm focus:outline-none focus:ring-2 focus:ring-orange-200"
                                     />
                                 </div>
-
-                                {/* Description */}
-                                <div>
-                                    <label className="text-xs font-bold text-text-muted uppercase">Descripción</label>
-                                    <p className="text-sm text-text-muted line-clamp-2 mt-1">{scrapedData.description}</p>
-                                </div>
-
-                                {/* Details/Specs */}
-                                {scrapedData.details && (
-                                    <div>
-                                        <label className="text-xs font-bold text-text-muted uppercase">Detalles/Especificaciones</label>
-                                        <p className="text-xs text-text-muted line-clamp-4 mt-1 whitespace-pre-line">{scrapedData.details}</p>
-                                    </div>
-                                )}
 
                                 {/* Price */}
                                 <div>
@@ -311,6 +302,14 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
                                     </p>
                                 </div>
 
+                                {/* Details/Specs (if any) */}
+                                {scrapedData.details && (
+                                    <div>
+                                        <label className="text-xs font-bold text-text-muted uppercase">Especificaciones detectadas</label>
+                                        <p className="text-xs text-text-muted line-clamp-4 mt-1 whitespace-pre-line bg-gray-50 p-2 rounded">{scrapedData.details}</p>
+                                    </div>
+                                )}
+
                                 {/* Source Link */}
                                 <a
                                     href={url}
@@ -319,10 +318,29 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
                                     className="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800"
                                 >
                                     <ExternalLink className="h-3 w-3" />
-                                    Ver original
+                                    Ver original (copiar descripción de aquí)
                                 </a>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Editable Description - FULL WIDTH */}
+                    <div className="bg-white rounded-xl border border-orange-200 p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <FileText className="h-4 w-4 text-orange-500" />
+                            <label className="text-sm font-bold text-text-main">Descripción del Producto</label>
+                            <span className="text-xs text-text-muted">(Puedes editar o pegar desde AliExpress)</span>
+                        </div>
+                        <textarea
+                            value={customDescription}
+                            onChange={(e) => setCustomDescription(e.target.value)}
+                            placeholder="Pega aquí la descripción completa del producto desde AliExpress (Información del producto, Descripción, Lista de productos, etc.)"
+                            rows={6}
+                            className="w-full px-4 py-3 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 resize-y"
+                        />
+                        <p className="text-xs text-text-muted mt-1">
+                            💡 Tip: Copia la sección "Información del producto" y "Descripción del producto" desde la página de AliExpress
+                        </p>
                     </div>
 
                     {/* Import Options */}
