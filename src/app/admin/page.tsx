@@ -18,6 +18,7 @@ import AdminSlidesSection from '@/components/AdminSlidesSection';
 import AdminCategoriesSection from '@/components/AdminCategoriesSection';
 import AdminSalesSection from '@/components/AdminSalesSection';
 import ImageUploader from '@/components/ImageUploader';
+import AdminAlibabaImporter from '@/components/AdminAlibabaImporter';
 
 interface Category {
     id: number;
@@ -279,6 +280,14 @@ export default function AdminDashboard() {
                                     className="block w-full pl-11 pr-4 py-3 bg-white border-none ring-1 ring-black/5 rounded-full text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-primary focus:outline-none transition-shadow shadow-sm"
                                 />
                             </div>
+                        </div>
+
+                        {/* Alibaba Importer (Beta) */}
+                        <div className="px-8 mb-6">
+                            <AdminAlibabaImporter
+                                categories={categories}
+                                onProductImported={loadData}
+                            />
                         </div>
 
                         {/* Products Table */}
