@@ -55,79 +55,146 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
         const attributes: Record<string, string> = {};
 
         // === EXTRAER TÍTULO ===
+        // Método 1: Meta Open Graph
         const ogTitleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
         if (ogTitleMatch) {
-            title = ogTitleMatch[1].replace(/-\s*AliExpress.*$/i, '').replace(/-\s*Alibaba.*$/i, '').trim();
+            title = ogTitleMatch[1]
+                .replace(/-\s*AliExpress.*$/i, '')
+                .replace(/-\s*Alibaba.*$/i, '')
+                .replace(/\s*\|\s*AliExpress.*$/i, '')
+                .trim();
         }
 
+        // Método 2: Title tag
         if (!title) {
             const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
             if (titleMatch) {
-                title = titleMatch[1].replace(/-\s*AliExpress.*$/i, '').replace(/-\s*Alibaba.*$/i, '').replace(/\|.*$/, '').trim();
+                title = titleMatch[1]
+                    .replace(/-\s*AliExpress.*$/i, '')
+                    .replace(/-\s*Alibaba.*$/i, '')
+                    .replace(/\|.*$/, '')
+                    .trim();
+            }
+        }
+
+        // Método 3: JSON estructurado - subject
+        if (!title || title.length < 10) {
+            const subjectMatch = html.match(/"subject":\s*"([^"]+)"/);
+            if (subjectMatch) {
+                title = subjectMatch[1].trim();
             }
         }
 
         // === EXTRAER DESCRIPCIÓN ===
-        const descMatch = html.match(/<meta\s+(?:name|property)="(?:description|og:description)"\s+content="([^"]+)"/i);
-        if (descMatch) {
-            description = descMatch[1].trim();
+        // AliExpress guarda la descripción en JSON, buscar múltiples patrones
+
+        // Patrón 1: description en JSON
+        const descJsonPatterns = [
+            /"description":\s*"([^"]{50,})"/i,
+            /"productDescription":\s*"([^"]{50,})"/i,
+            /"itemDescription":\s*"([^"]{50,})"/i,
+        ];
+
+        for (const pattern of descJsonPatterns) {
+            const match = html.match(pattern);
+            if (match && match[1] && !match[1].includes('Smarter Shopping')) {
+                description = match[1]
+                    .replace(/\\n/g, '\n')
+                    .replace(/\\r/g, '')
+                    .replace(/\\"/g, '"')
+                    .trim();
+                break;
+            }
+        }
+
+        // Patrón 2: Buscar en HTML con clases de descripción
+        if (!description || description.includes('Smarter Shopping')) {
+            const descHtmlPatterns = [
+                /<div[^>]*class="[^"]*product-description[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+                /<div[^>]*class="[^"]*description-content[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+                /<div[^>]*id="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+            ];
+
+            for (const pattern of descHtmlPatterns) {
+                const matches = html.match(pattern);
+                if (matches) {
+                    const cleanDesc = matches[0]
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    if (cleanDesc.length > 30 && !cleanDesc.includes('Smarter Shopping')) {
+                        description = cleanDesc.substring(0, 500);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Patrón 3: Título como descripción si no hay otra
+        if (!description || description.includes('Smarter Shopping')) {
+            description = title ? `${title}. Producto importado de ${source === 'aliexpress' ? 'AliExpress' : 'Alibaba'}.` : '';
         }
 
         // === EXTRAER DETALLES/ESPECIFICACIONES ===
-        // Buscar en JSON estructurado de AliExpress
+        // Buscar atributos del producto en JSON
+        const attrPatterns = [
+            /"attrName":\s*"([^"]+)",\s*"attrValue":\s*"([^"]+)"/gi,
+            /"name":\s*"([^"]{3,30})",\s*"value":\s*"([^"]+)"/gi,
+        ];
+
+        for (const pattern of attrPatterns) {
+            const matches = html.matchAll(pattern);
+            for (const match of matches) {
+                if (Object.keys(attributes).length < 15) {
+                    const key = match[1].trim();
+                    const value = match[2].trim();
+                    // Filtrar atributos irrelevantes
+                    if (!key.includes('http') && !value.includes('http') &&
+                        key.length > 1 && value.length > 0 &&
+                        !key.toLowerCase().includes('click') &&
+                        !key.toLowerCase().includes('script')) {
+                        attributes[key] = value;
+                    }
+                }
+            }
+        }
+
+        // Buscar especificaciones en skuPropertyList
         const specJsonMatch = html.match(/"skuPropertyList":\s*(\[[^\]]+\])/);
         if (specJsonMatch) {
             try {
                 const specs = JSON.parse(specJsonMatch[1]);
-                const detailsParts: string[] = [];
                 for (const spec of specs) {
-                    if (spec.skuPropertyName && spec.skuPropertyValues) {
-                        const values = spec.skuPropertyValues.map((v: any) => v.propertyValueDisplayName).join(', ');
-                        detailsParts.push(`${spec.skuPropertyName}: ${values}`);
+                    if (spec.skuPropertyName && spec.skuPropertyValues && Array.isArray(spec.skuPropertyValues)) {
+                        const values = spec.skuPropertyValues
+                            .map((v: any) => v.propertyValueDisplayName || v.skuPropertyValueName)
+                            .filter(Boolean)
+                            .join(', ');
+                        if (values) {
+                            attributes[spec.skuPropertyName] = values;
+                        }
                     }
-                }
-                if (detailsParts.length > 0) {
-                    details = detailsParts.join('\n');
                 }
             } catch (e) {
                 // Ignorar errores de parsing
             }
         }
 
-        // Buscar especificaciones en formato HTML
-        const specsHtmlMatch = html.match(/<div[^>]*class="[^"]*specification[^"]*"[^>]*>([\s\S]*?)<\/div>/gi);
-        if (specsHtmlMatch && !details) {
-            const specText = specsHtmlMatch.join(' ')
-                .replace(/<[^>]+>/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            if (specText.length > 10) {
-                details = specText.substring(0, 1000);
-            }
-        }
-
-        // Buscar atributos del producto
-        const attrMatches = html.matchAll(/"attrName":\s*"([^"]+)",\s*"attrValue":\s*"([^"]+)"/gi);
-        for (const match of attrMatches) {
-            if (Object.keys(attributes).length < 10) {
-                attributes[match[1]] = match[2];
-            }
-        }
-
-        // Convertir atributos a detalles si no tenemos
-        if (!details && Object.keys(attributes).length > 0) {
+        // Convertir atributos a detalles
+        if (Object.keys(attributes).length > 0) {
             details = Object.entries(attributes)
-                .map(([key, value]) => `${key}: ${value}`)
+                .map(([key, value]) => `• ${key}: ${value}`)
                 .join('\n');
         }
 
         // === EXTRAER PRECIO ===
         const pricePatterns = [
+            /"formatedActivityPrice":\s*"[^"]*\$?\s*([\d.]+)/i,
+            /"formatedPrice":\s*"[^"]*\$?\s*([\d.]+)/i,
+            /"minPrice":\s*"?([\d.]+)/i,
+            /"price":\s*"?([\d.]+)/i,
             /\$\s*([\d,]+\.?\d*)/,
             /USD\s*([\d,]+\.?\d*)/i,
-            /"minPrice":\s*"?([\d.]+)/i,
-            /"formatedActivityPrice":\s*"[^"]*\$\s*([\d.]+)/i,
-            /"formatedPrice":\s*"[^"]*\$\s*([\d.]+)/i,
         ];
 
         for (const pattern of pricePatterns) {
@@ -146,7 +213,7 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
         // 1. Open Graph images
         const ogImageMatches = html.matchAll(/<meta\s+property="og:image(?::url)?"\s+content="([^"]+)"/gi);
         for (const match of ogImageMatches) {
-            if (match[1] && !images.includes(match[1]) && images.length < 10) {
+            if (match[1] && !images.includes(match[1]) && images.length < 15) {
                 images.push(match[1]);
             }
         }
@@ -158,7 +225,7 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
             if (imgList) {
                 for (const img of imgList) {
                     const cleanImg = img.replace(/"/g, '').replace(/\\/g, '');
-                    if (cleanImg.startsWith('http') && !images.includes(cleanImg) && images.length < 10) {
+                    if (cleanImg.startsWith('http') && !images.includes(cleanImg) && images.length < 15) {
                         images.push(cleanImg);
                     }
                 }
@@ -172,14 +239,14 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
             if (imgList) {
                 for (const img of imgList) {
                     const cleanImg = img.replace(/"/g, '').replace(/\\/g, '');
-                    if (cleanImg.startsWith('http') && !images.includes(cleanImg) && images.length < 10) {
+                    if (cleanImg.startsWith('http') && !images.includes(cleanImg) && images.length < 15) {
                         images.push(cleanImg);
                     }
                 }
             }
         }
 
-        // 4. Buscar imágenes de CDN de AliExpress/Alibaba
+        // 4. Buscar imágenes de CDN de AliExpress/Alibaba con alta resolución
         const cdnImageMatches = html.matchAll(/(https?:\/\/[^"'\s<>]+(?:alicdn|ae01|cbu01)[^"'\s<>]+\.(?:jpg|jpeg|png|webp))/gi);
         for (const match of cdnImageMatches) {
             let imgUrl = match[1];
@@ -188,8 +255,10 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
                 !imgUrl.includes('icon') &&
                 !imgUrl.includes('50x50') &&
                 !imgUrl.includes('100x100') &&
+                !imgUrl.includes('_.webp') &&
+                !imgUrl.includes('_80x80') &&
                 !images.includes(imgUrl) &&
-                images.length < 10) {
+                images.length < 15) {
                 images.push(imgUrl);
             }
         }
@@ -206,8 +275,8 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
             success: true,
             data: {
                 title,
-                description: description || `Producto importado: ${title}`,
-                details: details || '',
+                description,
+                details,
                 price,
                 images,
                 attributes,
@@ -228,12 +297,13 @@ export async function importProductFromScrape(
     scrapedData: ScrapedProduct,
     categoryId: number,
     customPrice?: number,
-    customName?: string
+    customName?: string,
+    customDescription?: string
 ): Promise<{ success: boolean; productId?: number; error?: string }> {
     try {
         const product = await createProduct({
             name: customName || scrapedData.title,
-            description: scrapedData.description,
+            description: customDescription || scrapedData.description,
             details: scrapedData.details || null,
             priceUsd: customPrice || scrapedData.price || 10,
             isOffer: false,
