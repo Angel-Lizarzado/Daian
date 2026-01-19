@@ -24,7 +24,7 @@ export default function FavoritosPage() {
             `¡Hola Daian! Quiero comprar los siguientes productos:\n\n${productList}\n\n*Total: $${totalUsd.toFixed(2)} (Bs. ${formatVes(totalVes)})*`
         );
 
-        window.open(`https://wa.me/584164974877?text=${message}`, '_blank');
+        window.open(`https://wa.me/573003344963?text=${message}`, '_blank');
     };
 
     return (
@@ -122,7 +122,7 @@ export default function FavoritosPage() {
                                         </p>
                                     </div>
                                     <a
-                                        href={`https://wa.me/584164974877?text=${encodeURIComponent(`Hola Daian, quiero ${item.name} - $${item.priceUsd}`)}`}
+                                        href={`https://wa.me/573003344963?text=${encodeURIComponent(`Hola Daian, quiero ${item.name} - $${item.priceUsd}`)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] py-2.5 text-sm font-bold text-white hover:bg-[#20bd5a] transition-colors"

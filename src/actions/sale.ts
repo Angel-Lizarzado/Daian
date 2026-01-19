@@ -20,5 +20,5 @@ export async function logSaleAndGetWhatsAppUrl(input: LogSaleInput): Promise<str
     );
 
     // Return WhatsApp URL
-    return `https://wa.me/584164974877?text=${message}`;
+    return `https://wa.me/573003344963?text=${message}`;
 }

@@ -104,7 +104,7 @@ export default function HeroSlider({ slides }: HeroSliderProps) {
                                 {currentSlide.buttonText}
                             </Link>
                             <a
-                                href="https://wa.me/584164974877"
+                                href="https://wa.me/573003344963"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex h-12 items-center justify-center rounded-full border border-primary/30 bg-transparent px-8 text-sm font-bold text-text-main transition-all hover:bg-primary/10"
@@ -141,8 +141,8 @@ export default function HeroSlider({ slides }: HeroSliderProps) {
                                 key={index}
                                 onClick={() => goToSlide(index)}
                                 className={`h-2 rounded-full transition-all ${index === currentIndex
-                                        ? 'w-8 bg-primary'
-                                        : 'w-2 bg-text-main/20 hover:bg-text-main/40'
+                                    ? 'w-8 bg-primary'
+                                    : 'w-2 bg-text-main/20 hover:bg-text-main/40'
                                     }`}
                             />
                         ))}

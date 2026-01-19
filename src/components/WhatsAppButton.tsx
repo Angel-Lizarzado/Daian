@@ -47,7 +47,7 @@ export default function WhatsAppButton({
             const message = encodeURIComponent(
                 `Hola Daian, quiero ${quantity > 1 ? `${quantity}x ` : ''}${productName}. Precio: $${totalUsd.toFixed(2)} (Bs. ${priceVes}).`
             );
-            window.open(`https://wa.me/584164974877?text=${message}`, '_blank');
+            window.open(`https://wa.me/573003344963?text=${message}`, '_blank');
         } finally {
             setLoading(false);
         }
