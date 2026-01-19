@@ -81,15 +81,9 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
         // ... (rest of extraction logic)
 
         // === EXTRAER IMÁGENES ===
-        // 1. Open Graph images
-        const ogImageMatches = html.matchAll(/<meta\s+property="og:image(?::url)?"\s+content="([^"]+)"/gi);
-        for (const match of ogImageMatches) {
-            if (match[1] && !images.includes(match[1]) && images.length < 15) {
-                images.push(match[1]);
-            }
-        }
+        // Prioridad: JSON estructurado (es lo más preciso)
 
-        // 2. Buscar en JSON estructurado - imagePathList
+        // 1. Buscar en JSON estructurado - imagePathList
         const jsonImageMatch = html.match(/"imagePathList":\s*\[([^\]]+)\]/);
         if (jsonImageMatch) {
             const imgList = jsonImageMatch[1].match(/"([^"]+)"/g);
@@ -103,34 +97,53 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
             }
         }
 
-        // 3. Buscar galleryUrls en AliExpress
-        const galleryMatch = html.match(/"galleryUrls":\s*\[([^\]]+)\]/);
-        if (galleryMatch) {
-            const imgList = galleryMatch[1].match(/"([^"]+)"/g);
-            if (imgList) {
-                for (const img of imgList) {
-                    const cleanImg = img.replace(/"/g, '').replace(/\\/g, '');
-                    if (cleanImg.startsWith('http') && !images.includes(cleanImg) && images.length < 15) {
-                        images.push(cleanImg);
+        // 2. Buscar galleryUrls en AliExpress (otra variante común)
+        if (images.length < 3) {
+            const galleryMatch = html.match(/"galleryUrls":\s*\[([^\]]+)\]/);
+            if (galleryMatch) {
+                const imgList = galleryMatch[1].match(/"([^"]+)"/g);
+                if (imgList) {
+                    for (const img of imgList) {
+                        const cleanImg = img.replace(/"/g, '').replace(/\\/g, '');
+                        if (cleanImg.startsWith('http') && !images.includes(cleanImg) && images.length < 15) {
+                            images.push(cleanImg);
+                        }
                     }
                 }
             }
         }
 
-        // 4. Buscar imágenes de CDN de AliExpress/Alibaba con alta resolución
-        const cdnImageMatches = html.matchAll(/(https?:\/\/[^"'\s<>]+(?:alicdn|ae01|cbu01)[^"'\s<>]+\.(?:jpg|jpeg|png|webp))/gi);
-        for (const match of cdnImageMatches) {
-            let imgUrl = match[1];
-            // Filtrar imágenes pequeñas y avatares
-            if (!imgUrl.includes('avatar') &&
-                !imgUrl.includes('icon') &&
-                !imgUrl.includes('50x50') &&
-                !imgUrl.includes('100x100') &&
-                !imgUrl.includes('_.webp') &&
-                !imgUrl.includes('_80x80') &&
-                !images.includes(imgUrl) &&
-                images.length < 15) {
-                images.push(imgUrl);
+        // 3. Open Graph images (Backup si no hay JSON)
+        if (images.length === 0) {
+            const ogImageMatches = html.matchAll(/<meta\s+property="og:image(?::url)?"\s+content="([^"]+)"/gi);
+            for (const match of ogImageMatches) {
+                if (match[1] && !images.includes(match[1]) && images.length < 15) {
+                    images.push(match[1]);
+                }
+            }
+        }
+
+        // 4. Buscar imágenes de CDN (Solo si estamos desesperados o tenemos muy pocas)
+        if (images.length < 3) {
+            const cdnImageMatches = html.matchAll(/(https?:\/\/[^"'\s<>]+(?:alicdn|ae01|cbu01)[^"'\s<>]+\.(?:jpg|jpeg|png|webp))/gi);
+            for (const match of cdnImageMatches) {
+                let imgUrl = match[1];
+                // Filtro estricto para evitar basura
+                if (!imgUrl.includes('avatar') &&
+                    !imgUrl.includes('icon') &&
+                    !imgUrl.includes('logo') &&
+                    !imgUrl.includes('banner') &&
+                    !imgUrl.includes('search') &&
+                    !imgUrl.includes('brand') &&
+                    !imgUrl.includes('50x50') &&
+                    !imgUrl.includes('100x100') &&
+                    !imgUrl.includes('_.webp') &&
+                    !imgUrl.includes('_80x80') &&
+                    !imgUrl.includes('.gif') &&
+                    !images.includes(imgUrl) &&
+                    images.length < 15) {
+                    images.push(imgUrl);
+                }
             }
         }
 

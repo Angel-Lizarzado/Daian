@@ -322,7 +322,8 @@ export default function AdminAlibabaImporter({ categories, onProductImported }: 
                                                             src={video}
                                                             controls
                                                             className="w-full h-full"
-                                                            crossOrigin="anonymous"
+                                                            // @ts-ignore
+                                                            referrerPolicy="no-referrer"
                                                         />
                                                     </div>
                                                     <button

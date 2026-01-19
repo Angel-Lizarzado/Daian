@@ -91,6 +91,8 @@ export default function ProductGallery({
                             controls
                             playsInline
                             loop
+                            // @ts-ignore
+                            referrerPolicy="no-referrer"
                         // muted // Autoplay usually requires muted
                         />
                     </div>
@@ -149,6 +151,8 @@ export default function ProductGallery({
                                         src={item.url}
                                         className="w-full h-full object-cover opacity-70"
                                         muted // Muted for thumbnail
+                                        // @ts-ignore
+                                        referrerPolicy="no-referrer"
                                         onLoadedMetadata={(e) => {
                                             // Set to a few seconds in to show content instead of black frame?
                                             // (e.target as HTMLVideoElement).currentTime = 1;
