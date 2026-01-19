@@ -36,7 +36,7 @@ export async function scrapeProductFromUrl(url: string): Promise<ScrapeResult> {
 
         if (scraperApiKey) {
             // Usar ScraperAPI como proxy para evitar bloqueos
-            fetchUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=false`;
+            fetchUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=true&country_code=us`;
         }
 
         // Hacer fetch de la página
