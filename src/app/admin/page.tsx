@@ -65,8 +65,7 @@ export default function AdminDashboard() {
     const [saving, setSaving] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [activeTab, setActiveTab] = useState<'products' | 'slides' | 'categories' | 'sales'>('products');
-    const [editableImages, setEditableImages] = useState<string[]>([]);
-    const [editableVideos, setEditableVideos] = useState<string[]>([]);
+    const [editableMedia, setEditableMedia] = useState<string[]>([]);
 
     const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ProductFormData>();
     const priceUsd = watch('priceUsd');
@@ -104,8 +103,7 @@ export default function AdminDashboard() {
 
     const openCreateModal = () => {
         setEditingProduct(null);
-        setEditableImages([]);
-        setEditableVideos([]);
+        setEditableMedia([]);
         reset({
             name: '',
             description: '',
@@ -121,9 +119,12 @@ export default function AdminDashboard() {
 
     const openEditModal = (product: ProductWithCategory) => {
         setEditingProduct(product);
-        setEditableImages(product.images || []);
-        // @ts-ignore - videos might not be in the type yet if prisma client didn't update
-        setEditableVideos(product.videos || []);
+        // Merge existing images and videos into unified media list for sorting
+        // Note: videos field exists but we want to unify everything into 'images' on save
+        setEditableMedia([
+            ...(product.images || []),
+            ...(product.videos || [])
+        ]);
         reset({
             name: product.name,
             description: product.description,
@@ -137,24 +138,22 @@ export default function AdminDashboard() {
         setShowModal(true);
     };
 
-    const removeEditableImage = (indexToRemove: number) => {
-        setEditableImages(prev => prev.filter((_, i) => i !== indexToRemove));
+    const addMedia = (url: string) => {
+        setEditableMedia(prev => [...prev, url]);
     };
 
-    const addEditableImage = (url: string) => {
-        if (url && !editableImages.includes(url)) {
-            setEditableImages(prev => [...prev, url]);
+    const removeMedia = (index: number) => {
+        setEditableMedia(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const moveMedia = (index: number, direction: 'left' | 'right') => {
+        const newMedia = [...editableMedia];
+        if (direction === 'left' && index > 0) {
+            [newMedia[index - 1], newMedia[index]] = [newMedia[index], newMedia[index - 1]];
+        } else if (direction === 'right' && index < newMedia.length - 1) {
+            [newMedia[index + 1], newMedia[index]] = [newMedia[index], newMedia[index + 1]];
         }
-    };
-
-    const removeEditableVideo = (indexToRemove: number) => {
-        setEditableVideos(prev => prev.filter((_, i) => i !== indexToRemove));
-    };
-
-    const addEditableVideo = (url: string) => {
-        if (url && !editableVideos.includes(url)) {
-            setEditableVideos(prev => [...prev, url]);
-        }
+        setEditableMedia(newMedia);
     };
 
     const onSubmit = async (data: ProductFormData) => {
@@ -162,8 +161,10 @@ export default function AdminDashboard() {
         try {
             const productData = {
                 ...data,
-                images: editableImages,
-                videos: editableVideos,
+                // Save ALL media to 'images' to preserve order. 
+                // ProductGallery now auto-detects types.
+                images: editableMedia,
+                videos: [], // Clear legacy video field
             };
             if (editingProduct) {
                 await updateProduct(editingProduct.id, productData);
@@ -466,56 +467,69 @@ export default function AdminDashboard() {
                                 {errors.image && <p className="text-red-500 text-xs mt-1">{errors.image.message}</p>}
                             </div>
 
-                            {/* Multimedia Gallery (Unified) */}
+                            {/* Multimedia Gallery (Unified & Sortable) */}
                             <div>
                                 <div className="flex items-center justify-between mb-2">
-                                    <label className="block text-sm font-bold text-text-main">Galería Multimedia</label>
-                                    <span className="text-xs text-text-muted"> Imágenes & Videos</span>
+                                    <label className="block text-sm font-bold text-text-main">Galería Multimedia (Ordenable)</label>
+                                    <span className="text-xs text-text-muted">Usa las flechas para reordenar</span>
                                 </div>
 
                                 <div className="flex flex-wrap gap-2 mb-3">
-                                    {/* Images */}
-                                    {editableImages.map((img, index) => (
-                                        <div key={`img-${index}`} className="relative group w-20 h-20">
-                                            <div className="w-full h-full rounded-lg overflow-hidden border border-border">
-                                                <img
-                                                    src={img}
-                                                    alt={`Img ${index}`}
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=ERR'}
-                                                />
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeEditableImage(index)}
-                                                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-md z-10"
-                                                title="Eliminar imagen"
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    ))}
-
-                                    {/* Videos */}
-                                    {editableVideos.map((video, index) => (
-                                        <div key={`vid-${index}`} className="relative group w-20 h-20">
-                                            <div className="w-full h-full rounded-lg overflow-hidden border border-border bg-black flex items-center justify-center cursor-pointer group-hover:ring-2 ring-primary">
-                                                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                                                    <div className="w-0 h-0 border-l-[8px] border-l-white border-y-[6px] border-y-transparent ml-1"></div>
+                                    {editableMedia.map((url, index) => {
+                                        // Helper defined outside render or use simple check
+                                        const isVideo = url.toLowerCase().endsWith('.mp4') || url.toLowerCase().endsWith('.webm') || url.toLowerCase().includes('resource_type=video');
+                                        return (
+                                            <div key={index} className="relative group w-24 h-24 bg-gray-50 border border-border rounded-lg flex flex-col items-center justify-center p-1">
+                                                {/* Preview */}
+                                                <div className="w-full h-16 rounded overflow-hidden mb-1 bg-black/5 relative">
+                                                    {isVideo ? (
+                                                        <div className="w-full h-full bg-black flex items-center justify-center">
+                                                            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                                                                <div className="w-0 h-0 border-l-[6px] border-l-white border-y-[4px] border-y-transparent ml-0.5"></div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <img
+                                                            src={url}
+                                                            alt="Media"
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=ERR'}
+                                                        />
+                                                    )}
                                                 </div>
-                                                {/* Mini video preview on hover could go here, but keep simple for now */}
+
+                                                {/* Controls */}
+                                                <div className="flex items-center gap-1 w-full justify-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveMedia(index, 'left')}
+                                                        disabled={index === 0}
+                                                        className="p-1 hover:bg-gray-200 rounded disabled:opacity-20 text-text-muted transition-colors"
+                                                        title="Mover a la izquierda"
+                                                    >
+                                                        <ChevronLeft className="h-3 w-3" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeMedia(index)}
+                                                        className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors"
+                                                        title="Eliminar"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveMedia(index, 'right')}
+                                                        disabled={index === editableMedia.length - 1}
+                                                        className="p-1 hover:bg-gray-200 rounded disabled:opacity-20 text-text-muted transition-colors"
+                                                        title="Mover a la derecha"
+                                                    >
+                                                        <ChevronRight className="h-3 w-3" />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeEditableVideo(index)}
-                                                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-md z-10"
-                                                title="Eliminar video"
-                                            >
-                                                ×
-                                            </button>
-                                            <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white truncate px-1 py-0.5 text-center">Video</span>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Inputs for New Media */}
@@ -524,7 +538,7 @@ export default function AdminDashboard() {
                                     <div className="flex gap-2">
                                         <input
                                             type="url"
-                                            placeholder="URL de imagen adicional..."
+                                            placeholder="URL de imagen..."
                                             className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                                             id="newImageUrl"
                                         />
@@ -533,7 +547,7 @@ export default function AdminDashboard() {
                                             onClick={() => {
                                                 const input = document.getElementById('newImageUrl') as HTMLInputElement;
                                                 if (input.value) {
-                                                    addEditableImage(input.value);
+                                                    addMedia(input.value);
                                                     input.value = '';
                                                 }
                                             }}
@@ -550,10 +564,10 @@ export default function AdminDashboard() {
                                             value=""
                                             onChange={(url) => {
                                                 if (url) {
-                                                    addEditableVideo(url);
+                                                    addMedia(url);
                                                 }
                                             }}
-                                            placeholder="Pegar URL o subir archivo..."
+                                            placeholder="URL o archivo mp4..."
                                         />
                                     </div>
                                 </div>
