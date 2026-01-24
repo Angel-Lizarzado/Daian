@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     Store, Package, MessageCircle, BarChart3, Settings,
-    Plus, Search, Edit, Trash2, X, Loader2, Upload, Image as ImageIcon, Tag, DollarSign
+    Plus, Search, Edit, Trash2, X, Loader2, Upload, Image as ImageIcon, Tag, DollarSign,
+    ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { getProducts, createProduct, updateProduct, deleteProduct, type ProductWithCategory } from '@/actions/products';
