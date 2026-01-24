@@ -1,8 +1,13 @@
 'use server';
 
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function uploadImage(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
     try {
@@ -22,36 +27,40 @@ export async function uploadImage(formData: FormData): Promise<{ success: boolea
         }
 
         // Validate file size
-        // Images: 5MB, Videos: 50MB
+        // Images: 10MB (Cloudinary handles large images well), Videos: 100MB
+        // Note: Cloudinary Free plan has limits, but single file limits are generous. 
+        // Vercel Server Actions limit (60MB) is the main bottleneck for now.
         const isVideo = videoTypes.includes(file.type);
-        const maxSize = isVideo ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
+        const maxSize = isVideo ? 60 * 1024 * 1024 : 10 * 1024 * 1024;
 
         if (file.size > maxSize) {
-            return { success: false, error: `El archivo es muy grande. Máximo ${isVideo ? '50MB' : '5MB'}` };
+            return { success: false, error: `El archivo es muy grande. Máximo ${isVideo ? '60MB' : '10MB'}` };
         }
 
-        // Create uploads directory if it doesn't exist
-        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-        if (!existsSync(uploadsDir)) {
-            await mkdir(uploadsDir, { recursive: true });
-        }
-
-        // Generate unique filename
-        const timestamp = Date.now();
-        const extension = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
-        const filename = `${timestamp}-${Math.random().toString(36).substring(7)}.${extension}`;
-        const filepath = path.join(uploadsDir, filename);
-
-        // Convert file to buffer and save
+        // Convert file to buffer
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
-        await writeFile(filepath, buffer);
 
-        // Return the public URL
-        const url = `/uploads/${filename}`;
-        return { success: true, url };
+        // Upload to Cloudinary using a promise wrapper over the stream
+        const result = await new Promise<any>((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    folder: 'daian-store', // Keep organized
+                    resource_type: isVideo ? 'video' : 'image',
+                },
+                (error, result) => {
+                    if (error) reject(error);
+                    else resolve(result);
+                }
+            );
+
+            uploadStream.end(buffer);
+        });
+
+        // Return the secure Cloudinary URL
+        return { success: true, url: result.secure_url };
     } catch (error) {
-        console.error('Error uploading file:', error);
-        return { success: false, error: 'Error al subir el archivo' };
+        console.error('Error uploading file to Cloudinary:', error);
+        return { success: false, error: 'Error al subir el archivo a la nube' };
     }
 }
