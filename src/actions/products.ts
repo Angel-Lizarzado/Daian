@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { Product, Category } from '@prisma/client';
 import { demoProducts, demoCategories } from '@/lib/demo-data';
@@ -64,13 +65,17 @@ export async function createProduct(data: {
     videos?: string[];
     categoryId: number;
 }): Promise<Product> {
-    return prisma.product.create({
+    const product = await prisma.product.create({
         data: {
             ...data,
             images: data.images || [],
             videos: data.videos || [],
         },
     });
+
+    revalidatePath('/');
+    revalidatePath('/admin');
+    return product;
 }
 
 export async function updateProduct(
@@ -89,14 +94,22 @@ export async function updateProduct(
         categoryId?: number;
     }
 ): Promise<Product> {
-    return prisma.product.update({
+    const product = await prisma.product.update({
         where: { id },
         data,
     });
+
+    revalidatePath('/');
+    revalidatePath(`/product/${id}`);
+    revalidatePath('/admin');
+    return product;
 }
 
 export async function deleteProduct(id: number): Promise<void> {
     await prisma.product.delete({
         where: { id },
     });
+
+    revalidatePath('/');
+    revalidatePath('/admin');
 }

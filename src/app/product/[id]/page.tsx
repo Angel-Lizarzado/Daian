@@ -46,6 +46,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <ProductGallery
                     mainImage={product.image}
                     images={product.images || []}
+                    videos={product.videos || []}
                     productName={product.name}
                     isOffer={product.isOffer}
                     stock={product.stock}
