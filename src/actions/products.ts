@@ -7,6 +7,7 @@ import { demoProducts, demoCategories } from '@/lib/demo-data';
 
 export type ProductWithCategory = Product & {
     category: Category;
+    slug: string;
 };
 
 export async function getProducts(): Promise<ProductWithCategory[]> {

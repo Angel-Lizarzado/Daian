@@ -19,6 +19,9 @@ export default function ProductsSection({ products }: ProductsSectionProps) {
 
     // Leer parámetros de URL al cargar
     useEffect(() => {
+        console.log('ProductsSection received:', products?.length, 'products');
+        console.log('Sample product:', products?.[0]);
+
         const filterParam = searchParams.get('filter');
         const searchParam = searchParams.get('search');
         const categoryParam = searchParams.get('category');
@@ -84,6 +87,7 @@ export default function ProductsSection({ products }: ProductsSectionProps) {
             {/* Products Section Header */}
             <div id="products" className="mx-auto max-w-7xl px-6 py-8 lg:px-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
+                    <div className="hidden"> Debug: {products?.length} loaded </div>
                     <h3 className="font-serif-logo text-3xl font-bold text-text-main">
                         {categoryFilter
                             ? categoryFilter
